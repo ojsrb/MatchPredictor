@@ -1,12 +1,13 @@
-import pandas as pd
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.model_selection import train_test_split
-from sklearn import metrics
-from sklearn.preprocessing import StandardScaler
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+print(f"Using {device} device")
 
 data = pd.read_csv('finalized_combined.csv')
 
@@ -50,10 +51,10 @@ X_test = sc.transform(X_test)
 y_train = y_train.to_numpy()
 y_test = y_test.to_numpy()
 
-X_train = torch.from_numpy(X_train.astype(np.float32))
-X_test = torch.from_numpy(X_test.astype(np.float32))
-y_train = torch.from_numpy(y_train.astype(np.float32))
-y_test = torch.from_numpy(y_test.astype(np.float32))
+X_train = torch.from_numpy(X_train.astype(np.float32)).to(device)
+X_test = torch.from_numpy(X_test.astype(np.float32)).to(device)
+y_train = torch.from_numpy(y_train.astype(np.float32)).to(device)
+y_test = torch.from_numpy(y_test.astype(np.float32)).to(device)
 
 y_train = y_train.view(y_train.shape[0], 1)
 y_test = y_test.view(y_test.shape[0], 1)
@@ -76,7 +77,7 @@ class NeuralNetwork(nn.Module):
         logits = self.linear_relu_stack(x)
         return logits
 
-model = NeuralNetwork(features)
+model = NeuralNetwork(features).to(device)
 
 learning_rate = 0.1
 criterion = nn.BCEWithLogitsLoss()  # Using BCEWithLogitsLoss
@@ -103,4 +104,4 @@ with torch.no_grad():
     y_predicted = model(X_test)
     y_predicted_cls = torch.sigmoid(y_predicted).round()  # Apply sigmoid for probabilities
     acc = y_predicted_cls.eq(y_test).sum() / float(y_test.shape[0])
-    print(f'Accuracy: {acc:.4f}')
+    print(f'Accuracy: {acc * 100:.4f}%')
